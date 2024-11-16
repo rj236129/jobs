@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job History</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        h2, h3 {
+            color: #333;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .job-list {
+            margin-top: 10px;
+        }
+        .job-item {
+            background: #fff;
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .job-item h4 {
+            margin: 0;
+            color: #007BFF;
+        }
+        .job-item p {
+            margin: 5px 0;
+            color: #555;
+        }
+        .job-item .timestamp {
+            font-size: 0.85em;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+    <h2>Job History</h2>
+
+    <!-- Posted Jobs Section -->
+    <div class="section">
+        <h3>Posted Jobs</h3>
+        <div id="posted-jobs" class="job-list">
+            <!-- Posted jobs will be displayed here -->
+        </div>
+    </div>
+
+    <!-- Applied Jobs Section -->
+    <div class="section">
+        <h3>Applied Jobs</h3>
+        <div id="applied-jobs" class="job-list">
+            <!-- Applied jobs will be displayed here -->
+        </div>
+    </div>
+
+    <script type="module">
+        // Import Firebase SDK
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
+        import { getDatabase, ref, query, orderByChild, equalTo, onValue, get } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyA29bzuGtzVW-j5uH7rcEoQ3Uo5rqH84Bw",
+            authDomain: "jobs-c48f6.firebaseapp.com",
+            databaseURL: "https://jobs-c48f6-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "jobs-c48f6",
+            storageBucket: "jobs-c48f6.appspot.com",
+            messagingSenderId: "442042297958",
+            appId: "1:442042297958:web:5f8f5cf087b0ab6af6c7a7",
+            measurementId: "G-08YTDGG4RL"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getDatabase(app);
+
+        const postedJobsContainer = document.getElementById("posted-jobs");
+        const appliedJobsContainer = document.getElementById("applied-jobs");
+
+        // Display job history for logged-in user
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                const userId = user.uid;
+
+                // 1. Fetch jobs posted by the user
+                const postedJobsRef = query(ref(db, "jobs"), orderByChild("userId"), equalTo(userId));
+                onValue(postedJobsRef, (snapshot) => {
+                    postedJobsContainer.innerHTML = ""; // Clear previous content
+                    if (snapshot.exists()) {
+                        snapshot.forEach((childSnapshot) => {
+                            const job = childSnapshot.val();
+                            const jobItem = document.createElement("div");
+                            jobItem.classList.add("job-item");
+                            jobItem.innerHTML = `
+                                <h4>${job.title}</h4>
+                                <p><strong>Location:</strong> ${job.location}</p>
+                                <p><strong>Salary:</strong> ${job.salary}</p>
+                                <p><strong>Description:</strong> ${job.description}</p>
+                                <p class="timestamp"><strong>Posted At:</strong> ${new Date(job.postedAt).toLocaleString()}</p>
+                            `;
+                            postedJobsContainer.appendChild(jobItem);
+                        });
+                    } else {
+                        postedJobsContainer.innerHTML = `<p>No jobs posted yet.</p>`;
+                    }
+                });
+
+                // 2. Fetch jobs applied by the user
+                const applicationsRef = ref(db, "applications");
+                get(applicationsRef).then((snapshot) => {
+                    appliedJobsContainer.innerHTML = ""; // Clear previous content
+                    if (snapshot.exists()) {
+                        snapshot.forEach((childSnapshot) => {
+                            const application = childSnapshot.val();
+                            const userApplications = application[userId];
+                            if (userApplications) {
+                                const jobId = childSnapshot.key;
+                                get(ref(db, `jobs/${jobId}`)).then((jobSnapshot) => {
+                                    if (jobSnapshot.exists()) {
+                                        const job = jobSnapshot.val();
+                                        const jobItem = document.createElement("div");
+                                        jobItem.classList.add("job-item");
+                                        jobItem.innerHTML = `
+                                            <h4>${job.title}</h4>
+                                            <p><strong>Location:</strong> ${job.location}</p>
+                                            <p><strong>Salary:</strong> ${job.salary}</p>
+                                            <p><strong>Description:</strong> ${job.description}</p>
+                                            <p><strong>Your Resume:</strong> ${userApplications.resume}</p>
+                                            <p class="timestamp"><strong>Applied At:</strong> ${new Date(userApplications.appliedAt).toLocaleString()}</p>
+                                        `;
+                                        appliedJobsContainer.appendChild(jobItem);
+                                    }
+                                });
+                            }
+                        });
+                    } else {
+                        appliedJobsContainer.innerHTML = `<p>No applications submitted yet.</p>`;
+                    }
+                }).catch((error) => {
+                    console.error("Error fetching applied jobs:", error);
+                });
+            } else {
+                alert("Please log in to view your job history.");
+                window.location.href = "index.html"; // Redirect to login
+            }
+        });
+    </script>
+</body>
+</html>
