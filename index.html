@@ -65,7 +65,7 @@
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-analytics.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
         import { getDatabase, ref, push, get, child, update, remove } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
-
+        import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-messaging.js";
         const firebaseConfig = {
             apiKey: "AIzaSyA29bzuGtzVW-j5uH7rcEoQ3Uo5rqH84Bw",
             authDomain: "jobs-c48f6.firebaseapp.com",
@@ -81,6 +81,32 @@
         const analytics = getAnalytics(app);
         const db = getDatabase(app);
         const auth = getAuth(app);
+        const messaging = getMessaging(app);
+
+         // Request for permission to show notifications
+         Notification.requestPermission().then(permission => {
+            if (permission === "granted") {
+                console.log("Notification permission granted.");
+                getToken(messaging, { vapidKey: "YOUR_PUBLIC_VAPID_KEY" }).then((currentToken) => {
+                    if (currentToken) {
+                        console.log("FCM Token: ", currentToken);
+                        // Send this token to your server to store it
+                    } else {
+                        console.log("No registration token available.");
+                    }
+                }).catch((err) => {
+                    console.log("An error occurred while retrieving token.", err);
+                });
+            } else {
+                console.log("Notification permission denied.");
+            }
+        });
+
+        // Handle foreground messages
+        onMessage(messaging, (payload) => {
+            console.log("Message received. ", payload);
+            // Show notification here or update UI with the details
+        });
 
         const authSection = document.getElementById('auth-section');
         const postJobSection = document.getElementById('post-job-section');
