@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Job Portal</title>
-    <!-- Firebase Scripts -->
     <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-database.js"></script>
@@ -19,6 +18,10 @@
         button:hover { background-color: #218838; }
         .job-list { margin-top: 20px; }
         .job-item { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 5px; }
+        .apply-btn { background-color: #007bff; color: white; cursor: pointer; padding: 5px 10px; border: none; }
+        .apply-btn:hover { background-color: #0056b3; }
+        .edit-btn, .delete-btn { background-color: #ffc107; color: white; cursor: pointer; padding: 5px 10px; border: none; }
+        .edit-btn:hover, .delete-btn:hover { background-color: #e0a800; }
     </style>
 </head>
 <body>
@@ -35,6 +38,8 @@
                 <p id="toggle-auth">Don't have an account? <span style="color: blue; cursor: pointer;">Sign Up</span></p>
             </div>
         </div>
+
+        <!-- Post Job Section -->
         <div id="post-job-section" style="display: none;">
             <h2>Post a Job</h2>
             <div class="form-container">
@@ -45,6 +50,8 @@
                 <button id="post-job-btn">Post Job</button>
             </div>
         </div>
+
+        <!-- Jobs Section -->
         <div id="jobs-section" style="display: none;">
             <h2>Available Jobs</h2>
             <input type="text" id="search-input" placeholder="Search jobs..." onkeyup="searchJobs()">
@@ -56,7 +63,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-analytics.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
-        import { getDatabase, ref, push, get, child } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
+        import { getDatabase, ref, push, get, child, update, remove } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyA29bzuGtzVW-j5uH7rcEoQ3Uo5rqH84Bw",
@@ -131,68 +138,126 @@
             loadJobs();
         }
 
-        document.getElementById('post-job-btn').addEventListener('click', () => {
-            const jobTitle = document.getElementById('job-title').value;
-            const jobLocation = document.getElementById('job-location').value;
-            const jobSalary = document.getElementById('job-salary').value;
-            const jobDescription = document.getElementById('job-description').value;
-
-            if (!jobTitle || !jobLocation || !jobSalary || !jobDescription) {
-                alert('Please fill all fields.');
-                return;
-            }
-
-            const jobRef = ref(db, 'jobs');
-            push(jobRef, {
-                title: jobTitle,
-                location: jobLocation,
-                salary: jobSalary,
-                description: jobDescription,
-            }).then(() => {
-                alert('Job posted successfully!');
-                loadJobs();
-            });
-        });
-
         function loadJobs() {
             const jobList = document.getElementById('job-list');
-            jobList.innerHTML = '';
+            jobList.innerHTML = '';  // Clear the previous list of jobs
             const jobRef = ref(db, 'jobs');
             get(jobRef).then(snapshot => {
                 snapshot.forEach(childSnapshot => {
                     const job = childSnapshot.val();
+                    const jobId = childSnapshot.key;
                     const jobItem = document.createElement('div');
                     jobItem.classList.add('job-item');
-                    jobItem.innerHTML = `<h3>${job.title}</h3><p>${job.location} - ${job.salary}</p><p>${job.description}</p>`;
+
+                    const currentUserId = auth.currentUser.uid;  // Current logged-in user's UID
+
+                    // Job post HTML structure
+                    jobItem.innerHTML = `<h3>${job.title}</h3>
+                                         <p>${job.location} - ${job.salary}</p>
+                                         <p>${job.description}</p>`;
+
+                    // Show Edit and Delete buttons only for the user who posted the job
+                    if (job.userId === currentUserId) {
+                        const editBtn = document.createElement('button');
+                        editBtn.classList.add('edit-btn');
+                        editBtn.textContent = 'Edit Job';
+                        editBtn.onclick = () => editJob(jobId);
+                        jobItem.appendChild(editBtn);
+
+                        const deleteBtn = document.createElement('button');
+                        deleteBtn.classList.add('delete-btn');
+                        deleteBtn.textContent = 'Delete Job';
+                        deleteBtn.onclick = () => deleteJob(jobId);
+                        jobItem.appendChild(deleteBtn);
+                    }
+
+                    // Show Apply button only for users who did not post the job
+                    if (job.userId !== currentUserId) {
+                        const applyBtn = document.createElement('button');
+                        applyBtn.classList.add('apply-btn');
+                        applyBtn.textContent = 'Apply for Job';
+                        applyBtn.onclick = () => applyForJob(jobId);
+                        jobItem.appendChild(applyBtn);
+                    }
+
                     jobList.appendChild(jobItem);
                 });
             });
         }
 
-        function searchJobs() {
-            const searchTerm = document.getElementById('search-input').value.toLowerCase();
-            const jobItems = document.querySelectorAll('.job-item');
-            jobItems.forEach(item => {
-                const title = item.querySelector('h3').textContent.toLowerCase();
-                item.style.display = title.includes(searchTerm) ? 'block' : 'none';
+        function applyForJob(jobId) {
+            const resume = prompt("Please enter a brief description of your resume or attach a document.");
+            if (resume) {
+                const applicationsRef = ref(db, `applications/${jobId}`);
+                push(applicationsRef, {
+                    userId: auth.currentUser.uid,
+                    resume: resume
+                }).then(() => {
+                    alert('Application submitted!');
+                });
+            }
+        }
+
+        function editJob(jobId) {
+            const jobRef = ref(db, `jobs/${jobId}`);
+            get(jobRef).then(snapshot => {
+                const job = snapshot.val();
+                const newTitle = prompt("Edit job title:", job.title);
+                const newLocation = prompt("Edit job location:", job.location);
+                const newSalary = prompt("Edit job salary:", job.salary);
+                const newDescription = prompt("Edit job description:", job.description);
+
+                if (newTitle && newLocation && newSalary && newDescription) {
+                    update(jobRef, {
+                        title: newTitle,
+                        location: newLocation,
+                        salary: newSalary,
+                        description: newDescription
+                    }).then(() => {
+                        alert('Job updated!');
+                        loadJobs();  // Reload the jobs after updating
+                    }).catch(error => {
+                        alert('Error updating job: ' + error.message);
+                    });
+                }
             });
         }
 
-        // Sign-out functionality
-        function signOutUser() {
-            signOut(auth).then(() => {
-                alert('You have signed out.');
-                authSection.style.display = 'block';
-                postJobSection.style.display = 'none';
-                jobsSection.style.display = 'none';
-            }).catch(error => alert('Error: ' + error.message));
+        function deleteJob(jobId) {
+            const jobRef = ref(db, `jobs/${jobId}`);
+            remove(jobRef).then(() => {
+                alert('Job deleted!');
+                loadJobs();  // Reload jobs after deleting
+            }).catch(error => {
+                alert('Error deleting job: ' + error.message);
+            });
         }
 
-        // Optional: Add sign-out button somewhere in the UI
-        const signOutBtn = document.createElement('button');
-        signOutBtn.textContent = 'Sign Out';
-        signOutBtn.addEventListener('click', signOutUser);
-        document.body.appendChild(signOutBtn);
+        // Post job functionality
+        document.getElementById('post-job-btn').addEventListener('click', () => {
+            const title = document.getElementById('job-title').value;
+            const location = document.getElementById('job-location').value;
+            const salary = document.getElementById('job-salary').value;
+            const description = document.getElementById('job-description').value;
+            const userId = auth.currentUser.uid;
+
+            if (!title || !location || !salary || !description) {
+                alert('Please fill all fields');
+                return;
+            }
+
+            const jobRef = ref(db, 'jobs');
+            push(jobRef, {
+                title,
+                location,
+                salary,
+                description,
+                userId
+            }).then(() => {
+                alert('Job posted!');
+                loadJobs();  // Reload jobs after posting
+            });
+        });
     </script>
 </body>
 </html>
