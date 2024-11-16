@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Portal</title>
+    <!-- Firebase Scripts -->
+    <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-database.js"></script>
+
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+        .header { background-color: #333; color: white; text-align: center; padding: 10px; }
+        .container { padding: 20px; }
+        .form-container { max-width: 400px; margin: auto; padding: 20px; border: 1px solid #ccc; border-radius: 10px; background: #f9f9f9; }
+        input, textarea, button { width: 100%; margin-bottom: 10px; padding: 10px; font-size: 16px; }
+        button { background-color: #28a745; color: white; border: none; cursor: pointer; }
+        button:hover { background-color: #218838; }
+        .job-list { margin-top: 20px; }
+        .job-item { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Job Portal</h1>
+    </div>
+    <div class="container">
+        <div id="auth-section">
+            <h2 id="auth-title">Login</h2>
+            <div class="form-container">
+                <input type="email" id="auth-email" placeholder="Email" required>
+                <input type="password" id="auth-password" placeholder="Password" required>
+                <button id="auth-btn">Login</button>
+                <p id="toggle-auth">Don't have an account? <span style="color: blue; cursor: pointer;">Sign Up</span></p>
+            </div>
+        </div>
+        <div id="post-job-section" style="display: none;">
+            <h2>Post a Job</h2>
+            <div class="form-container">
+                <input type="text" id="job-title" placeholder="Job Title" required>
+                <input type="text" id="job-location" placeholder="Location" required>
+                <input type="text" id="job-salary" placeholder="Salary" required>
+                <textarea id="job-description" rows="4" placeholder="Job Description" required></textarea>
+                <button id="post-job-btn">Post Job</button>
+            </div>
+        </div>
+        <div id="jobs-section" style="display: none;">
+            <h2>Available Jobs</h2>
+            <input type="text" id="search-input" placeholder="Search jobs..." onkeyup="searchJobs()">
+            <div class="job-list" id="job-list"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-analytics.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
+        import { getDatabase, ref, push, get, child } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyA29bzuGtzVW-j5uH7rcEoQ3Uo5rqH84Bw",
+            authDomain: "jobs-c48f6.firebaseapp.com",
+            databaseURL: "https://jobs-c48f6-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "jobs-c48f6",
+            storageBucket: "jobs-c48f6.firebasestorage.app",
+            messagingSenderId: "442042297958",
+            appId: "1:442042297958:web:5f8f5cf087b0ab6af6c7a7",
+            measurementId: "G-08YTDGG4RL"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+        const db = getDatabase(app);
+        const auth = getAuth(app);
+
+        const authSection = document.getElementById('auth-section');
+        const postJobSection = document.getElementById('post-job-section');
+        const jobsSection = document.getElementById('jobs-section');
+        const toggleAuth = document.getElementById('toggle-auth');
+        const authBtn = document.getElementById('auth-btn');
+        let isLogin = true;
+
+        toggleAuth.addEventListener('click', () => {
+            isLogin = !isLogin;
+            document.getElementById('auth-title').textContent = isLogin ? 'Login' : 'Sign Up';
+            authBtn.textContent = isLogin ? 'Login' : 'Sign Up';
+        });
+
+        authBtn.addEventListener('click', () => {
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+
+            if (!email || !password) {
+                alert('Please enter both email and password.');
+                return;
+            }
+
+            if (isLogin) {
+                signInWithEmailAndPassword(auth, email, password)
+                    .then(() => {
+                        alert('Login successful!');
+                        showSections();
+                    })
+                    .catch((error) => alert('Error: ' + error.message));
+            } else {
+                createUserWithEmailAndPassword(auth, email, password)
+                    .then(() => {
+                        alert('Sign-up successful!');
+                        showSections();
+                    })
+                    .catch((error) => alert('Error: ' + error.message));
+            }
+        });
+
+        // Check if user is logged in on page load
+        onAuthStateChanged(auth, user => {
+            if (user) {
+                showSections();
+            } else {
+                authSection.style.display = 'block';
+                postJobSection.style.display = 'none';
+                jobsSection.style.display = 'none';
+            }
+        });
+
+        function showSections() {
+            authSection.style.display = 'none';
+            postJobSection.style.display = 'block';
+            jobsSection.style.display = 'block';
+            loadJobs();
+        }
+
+        document.getElementById('post-job-btn').addEventListener('click', () => {
+            const jobTitle = document.getElementById('job-title').value;
+            const jobLocation = document.getElementById('job-location').value;
+            const jobSalary = document.getElementById('job-salary').value;
+            const jobDescription = document.getElementById('job-description').value;
+
+            if (!jobTitle || !jobLocation || !jobSalary || !jobDescription) {
+                alert('Please fill all fields.');
+                return;
+            }
+
+            const jobRef = ref(db, 'jobs');
+            push(jobRef, {
+                title: jobTitle,
+                location: jobLocation,
+                salary: jobSalary,
+                description: jobDescription,
+            }).then(() => {
+                alert('Job posted successfully!');
+                loadJobs();
+            });
+        });
+
+        function loadJobs() {
+            const jobList = document.getElementById('job-list');
+            jobList.innerHTML = '';
+            const jobRef = ref(db, 'jobs');
+            get(jobRef).then(snapshot => {
+                snapshot.forEach(childSnapshot => {
+                    const job = childSnapshot.val();
+                    const jobItem = document.createElement('div');
+                    jobItem.classList.add('job-item');
+                    jobItem.innerHTML = `<h3>${job.title}</h3><p>${job.location} - ${job.salary}</p><p>${job.description}</p>`;
+                    jobList.appendChild(jobItem);
+                });
+            });
+        }
+
+        function searchJobs() {
+            const searchTerm = document.getElementById('search-input').value.toLowerCase();
+            const jobItems = document.querySelectorAll('.job-item');
+            jobItems.forEach(item => {
+                const title = item.querySelector('h3').textContent.toLowerCase();
+                item.style.display = title.includes(searchTerm) ? 'block' : 'none';
+            });
+        }
+
+        // Sign-out functionality
+        function signOutUser() {
+            signOut(auth).then(() => {
+                alert('You have signed out.');
+                authSection.style.display = 'block';
+                postJobSection.style.display = 'none';
+                jobsSection.style.display = 'none';
+            }).catch(error => alert('Error: ' + error.message));
+        }
+
+        // Optional: Add sign-out button somewhere in the UI
+        const signOutBtn = document.createElement('button');
+        signOutBtn.textContent = 'Sign Out';
+        signOutBtn.addEventListener('click', signOutUser);
+        document.body.appendChild(signOutBtn);
+    </script>
+</body>
+</html>
