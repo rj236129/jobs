@@ -12,12 +12,12 @@
         body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
         .header { background-color: #333; color: white; text-align: center; padding: 10px; }
         .container { padding: 20px; }
-        .form-container { max-width: 400px; margin: auto; padding: 20px; border: 1px solid #ccc; border-radius: 10px; background: #f9f9f9; }
-        input, textarea, button { width: 100%; margin-bottom: 10px; padding: 10px; font-size: 16px; }
+        .form-container { max-inline-size: 400px; margin: auto; padding: 20px; border: 1px solid #ccc; border-radius: 10px; background: #f9f9f9; }
+        input, textarea, button { inline-size: 100%; margin-block-end: 10px; padding: 10px; font-size: 16px; }
         button { background-color: #28a745; color: white; border: none; cursor: pointer; }
         button:hover { background-color: #218838; }
-        .job-list { margin-top: 20px; }
-        .job-item { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 5px; }
+        .job-list { margin-block-start: 20px; }
+        .job-item { border: 1px solid #ddd; padding: 10px; margin-block-end: 10px; border-radius: 5px; }
         .apply-btn { background-color: #007bff; color: white; cursor: pointer; padding: 5px 10px; border: none; }
         .apply-btn:hover { background-color: #0056b3; }
         .edit-btn, .delete-btn { background-color: #ffc107; color: white; cursor: pointer; padding: 5px 10px; border: none; }
@@ -27,6 +27,7 @@
 <body>
     <div class="header">
         <h1>Job Portal</h1>
+        <button onclick="window.location.href='histroy.html'">View Job History</button>
     </div>
     <div class="container">
         <div id="auth-section">
